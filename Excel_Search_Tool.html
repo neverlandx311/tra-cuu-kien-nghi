@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Tra cứu dữ liệu Google Sheets</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button, select { margin: 5px; padding: 5px; }
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #d4d4d4;
+      border-bottom: none;
+      border-top: none;
+      z-index: 99;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+    }
+    .autocomplete-items div {
+      padding: 10px;
+      cursor: pointer;
+      background-color: #fff;
+      border-bottom: 1px solid #d4d4d4;
+    }
+    .autocomplete-items div:hover {
+      background-color: #e9e9e9;
+    }
+  </style>
+</head>
+<body>
+  <h2>Tra cứu dữ liệu từ Google Sheets</h2>
+
+  <label>Từ ngày: <input type="date" id="fromDate" /></label>
+  <label>Đến ngày: <input type="date" id="toDate" /></label>
+  <div style="position: relative; display: inline-block;">
+    <label>Đơn vị thực hiện: <input type="text" id="donVi" autocomplete="off" /></label>
+    <div id="autocomplete-list" class="autocomplete-items"></div>
+  </div>
+  <br/>
+  <label>Trạng thái:
+    <select id="trangThai">
+      <option value="">-- Tất cả --</option>
+      <option value="0">Chưa hoàn thành</option>
+      <option value="1">Đã hoàn thành</option>
+    </select>
+  </label>
+  <button id="searchButton">Tìm kiếm</button>
+
+  <div id="summary"></div>
+  <div id="result"></div>
+
+  <script>
+    let allUnits = new Set();
+    let cachedKienNghi = [];
+    let ketLuanMap = {};
+
+    async function fetchData() {
+      const res1 = await fetch("https://opensheet.vercel.app/18gTxbvYbAFGNMEPWWyRhBEN7sjP_qT34QlTvUfTo2fo/kien nghi");
+      const data1 = await res1.json();
+      cachedKienNghi = data1;
+      data1.forEach(row => {
+        const donVi = row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"];
+        if (donVi) allUnits.add(donVi.trim());
+      });
+
+      const res2 = await fetch("https://opensheet.vercel.app/18gTxbvYbAFGNMEPWWyRhBEN7sjP_qT34QlTvUfTo2fo/bieu tong hop");
+      const data2 = await res2.json();
+      data2.forEach(row => {
+        const soKL = row["KẾT LUẬN - Số ký hiệu"];
+        const trichYeu = row["KẾT LUẬN - Trích yếu kết luận"];
+        if (soKL && trichYeu) ketLuanMap[soKL.trim()] = trichYeu;
+      });
+
+      setupAutocomplete([...allUnits]);
+    }
+
+    function setupAutocomplete(arr) {
+      const input = document.getElementById("donVi");
+      input.addEventListener("input", function () {
+        const val = this.value;
+        closeAllLists();
+        if (!val) return false;
+        const listDiv = document.getElementById("autocomplete-list");
+        arr.forEach(unit => {
+          if (unit.toLowerCase().includes(val.toLowerCase())) {
+            const item = document.createElement("div");
+            item.innerHTML = unit;
+            item.addEventListener("click", function () {
+              input.value = unit;
+              closeAllLists();
+            });
+            listDiv.appendChild(item);
+          }
+        });
+      });
+    }
+
+    function closeAllLists() {
+      const items = document.getElementsByClassName("autocomplete-items");
+      for (let i = 0; i < items.length; i++) {
+        items[i].innerHTML = "";
+      }
+    }
+
+    function renderSummary(data, grouped) {
+      const summaryDiv = document.getElementById('summary');
+
+      let allKetLuan = new Set();
+      let daHoanThanh = 0;
+      let chuaHoanThanh = 0;
+
+      cachedKienNghi.forEach(row => {
+        const donVi = document.getElementById('donVi').value.toLowerCase();
+        const donViCol = (row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"] || "").toLowerCase();
+        if (donVi && !donViCol.includes(donVi)) return;
+
+        const soKL = row["KẾT LUẬN - Số ký hiệu"];
+        if (soKL) allKetLuan.add(soKL);
+
+        const cotAA = (row["Kiến nghị đã hoàn thành"] || "").toString().trim();
+        if (/^1(\.0+)?$/.test(cotAA)) daHoanThanh++;
+        else chuaHoanThanh++;
+      });
+
+      let html = '<h3>Thống kê</h3><ul>';
+      html += `<li>Tổng số kết luận phải thực hiện: <strong>${allKetLuan.size}</strong></li>`;
+      html += `<li>Tổng số kiến nghị đã hoàn thành: <strong>${daHoanThanh}</strong></li>`;
+      html += `<li>Tổng số kiến nghị chưa hoàn thành: <strong>${chuaHoanThanh}</strong></li>`;
+      html += '</ul>';
+      summaryDiv.innerHTML = html;
+    }
+
+    function renderTable(grouped) {
+      const resultDiv = document.getElementById('result');
+      if (Object.keys(grouped).length === 0) {
+        resultDiv.innerHTML = '<p>Không tìm thấy kết quả phù hợp.</p>';
+        return;
+      }
+      let title = '';
+      if (document.getElementById('trangThai').value === '1') title = '<h3>Chi tiết kiến nghị đã hoàn thành</h3>';
+      else if (document.getElementById('trangThai').value === '0') title = '<h3>Chi tiết kiến nghị chưa hoàn thành</h3>';
+      else title = '<h3>Chi tiết kiến nghị</h3>';
+      let html = title + '<table border="1" cellpadding="5" cellspacing="0"><thead><tr><th>STT</th><th>Số kết luận</th><th>Trích yếu kết luận</th><th>Số kiến nghị</th></tr></thead><tbody>';
+      let index = 1;
+      for (const soKL in grouped) {
+        const rows = grouped[soKL];
+        const trichYeu = ketLuanMap[soKL] || "(Không có trích yếu)";
+        html += `<tr>
+          <td>${index}</td>
+          <td>${soKL}</td>
+          <td>${trichYeu}</td>
+          <td>${rows.length}</td>
+        </tr>`;
+        index++;
+      }
+      html += '</tbody></table>';
+      resultDiv.innerHTML = html;
+    }
+
+    function handleSearch() {
+      const donVi = document.getElementById('donVi').value.toLowerCase();
+      const trangThai = document.getElementById('trangThai').value;
+
+      const filtered = cachedKienNghi.filter(row => {
+        const donViCol = (row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"] || "").toLowerCase();
+        const cotAA = (row["Kiến nghị đã hoàn thành"] || "").toString().trim();
+        const matchDonVi = !donVi || donViCol.includes(donVi);
+        const matchTrangThai = trangThai === "" || new RegExp(`^${trangThai}(\.0+)?$`).test(cotAA);
+        return matchDonVi && matchTrangThai;
+      });
+
+      const grouped = {};
+      filtered.forEach(row => {
+        const soKL = row["KẾT LUẬN - Số ký hiệu"];
+        if (!soKL) return;
+        if (!grouped[soKL]) grouped[soKL] = [];
+        grouped[soKL].push(row);
+      });
+
+      renderSummary(filtered, grouped);
+      renderTable(grouped);
+    }
+
+    fetchData();
+    document.getElementById('searchButton').addEventListener('click', handleSearch);
+  </script>
+</body>
+</html>
