@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -151,12 +150,36 @@
           <td>${index}</td>
           <td>${soKL}</td>
           <td>${trichYeu}</td>
-          <td>${rows.length}</td>
+          <td><a href="#" onclick="toggleDetails('${soKL}');return false;">${rows.length}</a></td>
         </tr>`;
+        html += `<tr id="${soKL}" style="display:none;"><td colspan="4"><ul>`;
+        rows.forEach((r, i) => {
+          const nd = r["Nội dung kiến nghị tại Kết luận thanh tra"] || "(Không có nội dung)";
+          let kq = "";
+          let canCu = "";
+
+          if (document.getElementById('trangThai').value === '1') {
+            kq = r["Nội dung kiến nghị đã hoàn thành"] || "(Không có kết quả hoàn thành)";
+            canCu = r["Căn cứ cập nhật nội dung đã hoàn thành"] || "(Không có căn cứ)";
+          } else if (document.getElementById('trangThai').value === '0') {
+            kq = r["Nội dung kiến nghị còn đang thực hiện"] || "(Không có kết quả chưa thực hiện)";
+            canCu = r["Căn cứ cập nhật nội dung chưa thực hiện dứt điểm"] || "(Không có căn cứ)";
+          }
+
+          html += `<li><strong>Kiến nghị ${i + 1}:</strong><br/>- Nội dung: ${nd}<br/>- Kết quả: ${kq}<br/>- Căn cứ tổng hợp: ${canCu}</li>`;
+        });
+        html += `</ul></td></tr>`;
         index++;
       }
       html += '</tbody></table>';
       resultDiv.innerHTML = html;
+    }
+
+    function toggleDetails(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
+      }
     }
 
     function handleSearch() {
@@ -167,7 +190,8 @@
         const donViCol = (row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"] || "").toLowerCase();
         const cotAA = (row["Kiến nghị đã hoàn thành"] || "").toString().trim();
         const matchDonVi = !donVi || donViCol.includes(donVi);
-        const matchTrangThai = trangThai === "" || new RegExp(`^${trangThai}(\.0+)?$`).test(cotAA);
+        const matchTrangThai = trangThai === "" || new RegExp(`^${trangThai}(\\.0+)?$`).test(cotAA);
+
         return matchDonVi && matchTrangThai;
       });
 
