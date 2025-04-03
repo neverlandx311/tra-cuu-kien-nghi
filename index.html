@@ -103,6 +103,23 @@
   <p>Phần tổng hợp đôn đốc sẽ được bổ sung tại đây.</p>
 </div>
 
+<script>
+// Kích hoạt tab khi bấm vào
+document.querySelectorAll(".tablinks").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".tabcontent").forEach(tab => tab.style.display = "none");
+    document.querySelectorAll(".tablinks").forEach(btn => btn.classList.remove("active"));
+    const tabId = button.getAttribute("data-tab");
+    document.getElementById(tabId).style.display = "block";
+    button.classList.add("active");
+  });
+});
+// Mặc định mở tab đầu tiên
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelector(".tablinks").click();
+});
+</script>
+
 <script src="tonghop_baocao.js"></script>
 <script src="tracuu_du_lieu.js"></script>
 </body>
