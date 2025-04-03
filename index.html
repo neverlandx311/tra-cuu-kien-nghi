@@ -1,11 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Tra cứu dữ liệu Google Sheets</title>
+  <title>Project BCDK - Tổng hợp và Tra cứu dữ liệu</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     input, button, select { margin: 5px; padding: 5px; }
+    .tab {
+      overflow: hidden;
+      border-bottom: 1px solid #ccc;
+    }
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 10px 20px;
+      transition: 0.3s;
+    }
+    .tab button:hover { background-color: #ddd; }
+    .tab button.active { background-color: #ccc; }
+    .tabcontent { display: none; padding: 10px; }
     .autocomplete-items {
       position: absolute;
       border: 1px solid #d4d4d4;
@@ -29,186 +46,64 @@
   </style>
 </head>
 <body>
-  <h2>Tra cứu dữ liệu từ Google Sheets</h2>
 
-  <label>Từ ngày: <input type="date" id="fromDate" /></label>
-  <label>Đến ngày: <input type="date" id="toDate" /></label>
-  <div style="position: relative; display: inline-block;">
-    <label>Đơn vị thực hiện: <input type="text" id="donVi" autocomplete="off" /></label>
-    <div id="autocomplete-list" class="autocomplete-items"></div>
+<div class="tab">
+  <button class="tablinks" data-tab="baoCao">Tổng hợp báo cáo</button>
+  <button class="tablinks" data-tab="traCuu">Tra cứu dữ liệu</button>
+  <button class="tablinks" data-tab="donDoc">Tổng hợp đôn đốc</button>
+</div>
+
+<div id="baoCao" class="tabcontent">
+  <h3>Tổng hợp báo cáo</h3>
+  <label>Kỳ tổng hợp báo cáo:</label><br>
+  <label>Từ ngày: <input type="date" id="baoCaoFromDate" /></label>
+  <label>Đến ngày: <input type="date" id="baoCaoToDate" /></label><br><br>
+  <button id="btnTongHop">Tổng hợp báo cáo định kỳ</button>
+  <div id="ketQuaBaoCao"></div>
+</div>
+
+<div id="traCuu" class="tabcontent">
+  <h3>Tra cứu dữ liệu từ Google Sheets</h3>
+  <p><strong>Lựa chọn tiêu chí tìm kiếm:</strong></p>
+  <label><input type="checkbox" id="checkboxDonVi"> Tìm kiếm theo đơn vị thực hiện</label>
+  <label><input type="checkbox" id="checkboxKetLuan"> Tìm kiếm theo kết luận thanh tra</label>
+
+  <div style="margin-top: 10px; display: none;" id="donViContainer">
+    <label for="donVi">Tra cứu theo tên đơn vị thực hiện theo kết luận thanh tra: </label>
+    <input type="text" id="donVi" autocomplete="off" style="width: 300px;" />
   </div>
-  <br/>
-  <label>Trạng thái:
-    <select id="trangThai">
-      <option value="">-- Tất cả --</option>
-      <option value="0">Chưa hoàn thành</option>
-      <option value="1">Đã hoàn thành</option>
-    </select>
-  </label>
-  <button id="searchButton">Tìm kiếm</button>
 
+  <div style="margin-top: 10px; display: none;" id="donViHienNayContainer">
+    <label for="donViHienNay">Tra cứu theo tên đơn vị thực hiện hiện nay: </label>
+    <input type="text" id="donViHienNay" style="width: 300px;" />
+  </div>
+
+  <div style="margin-top: 10px; display: none;" id="ketLuanContainer">
+    <label for="soKetLuan">Số kết luận thanh tra: </label>
+    <input type="text" id="soKetLuan" style="width: 300px;" />
+  </div>
+
+  <div style="margin-top: 10px; display: none;" id="trangThaiContainer">
+    <label>Trạng thái:
+      <select id="trangThai">
+        <option value="">-- Tất cả --</option>
+        <option value="0">Chưa hoàn thành</option>
+        <option value="1">Đã hoàn thành</option>
+      </select>
+    </label>
+  </div>
+
+  <button id="searchButton">Tìm kiếm</button>
   <div id="summary"></div>
   <div id="result"></div>
+</div>
 
-  <script>
-    let allUnits = new Set();
-    let cachedKienNghi = [];
-    let ketLuanMap = {};
+<div id="donDoc" class="tabcontent">
+  <h3>Tổng hợp đôn đốc</h3>
+  <p>Phần tổng hợp đôn đốc sẽ được bổ sung tại đây.</p>
+</div>
 
-    async function fetchData() {
-      const res1 = await fetch("https://opensheet.vercel.app/18gTxbvYbAFGNMEPWWyRhBEN7sjP_qT34QlTvUfTo2fo/kien nghi");
-      const data1 = await res1.json();
-      cachedKienNghi = data1;
-      data1.forEach(row => {
-        const donVi = row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"];
-        if (donVi) allUnits.add(donVi.trim());
-      });
-
-      const res2 = await fetch("https://opensheet.vercel.app/18gTxbvYbAFGNMEPWWyRhBEN7sjP_qT34QlTvUfTo2fo/bieu tong hop");
-      const data2 = await res2.json();
-      data2.forEach(row => {
-        const soKL = row["KẾT LUẬN - Số ký hiệu"];
-        const trichYeu = row["KẾT LUẬN - Trích yếu kết luận"];
-        if (soKL && trichYeu) ketLuanMap[soKL.trim()] = trichYeu;
-      });
-
-      setupAutocomplete([...allUnits]);
-    }
-
-    function setupAutocomplete(arr) {
-      const input = document.getElementById("donVi");
-      input.addEventListener("input", function () {
-        const val = this.value;
-        closeAllLists();
-        if (!val) return false;
-        const listDiv = document.getElementById("autocomplete-list");
-        arr.forEach(unit => {
-          if (unit.toLowerCase().includes(val.toLowerCase())) {
-            const item = document.createElement("div");
-            item.innerHTML = unit;
-            item.addEventListener("click", function () {
-              input.value = unit;
-              closeAllLists();
-            });
-            listDiv.appendChild(item);
-          }
-        });
-      });
-    }
-
-    function closeAllLists() {
-      const items = document.getElementsByClassName("autocomplete-items");
-      for (let i = 0; i < items.length; i++) {
-        items[i].innerHTML = "";
-      }
-    }
-
-    function renderSummary(data, grouped) {
-      const summaryDiv = document.getElementById('summary');
-
-      let allKetLuan = new Set();
-      let daHoanThanh = 0;
-      let chuaHoanThanh = 0;
-
-      cachedKienNghi.forEach(row => {
-        const donVi = document.getElementById('donVi').value.toLowerCase();
-        const donViCol = (row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"] || "").toLowerCase();
-        if (donVi && !donViCol.includes(donVi)) return;
-
-        const soKL = row["KẾT LUẬN - Số ký hiệu"];
-        if (soKL) allKetLuan.add(soKL);
-
-        const cotAA = (row["Kiến nghị đã hoàn thành"] || "").toString().trim();
-        if (/^1(\.0+)?$/.test(cotAA)) daHoanThanh++;
-        else chuaHoanThanh++;
-      });
-
-      let html = '<h3>Thống kê</h3><ul>';
-      html += `<li>Tổng số kết luận phải thực hiện: <strong>${allKetLuan.size}</strong></li>`;
-      html += `<li>Tổng số kiến nghị đã hoàn thành: <strong>${daHoanThanh}</strong></li>`;
-      html += `<li>Tổng số kiến nghị chưa hoàn thành: <strong>${chuaHoanThanh}</strong></li>`;
-      html += '</ul>';
-      summaryDiv.innerHTML = html + "<p>Kết luận</p>";
-    }
-
-    function renderTable(grouped) {
-      const resultDiv = document.getElementById('result');
-      if (Object.keys(grouped).length === 0) {
-        resultDiv.innerHTML = '<p>Không tìm thấy kết quả phù hợp.</p>';
-        return;
-      }
-      let title = '';
-      if (document.getElementById('trangThai').value === '1') title = '<h3>Chi tiết kiến nghị đã hoàn thành</h3>';
-      else if (document.getElementById('trangThai').value === '0') title = '<h3>Chi tiết kiến nghị chưa hoàn thành</h3>';
-      else title = '<h3>Chi tiết kiến nghị</h3>';
-      let html = title + '<table border="1" cellpadding="5" cellspacing="0"><thead><tr><th>STT</th><th>Số kết luận</th><th>Trích yếu kết luận</th><th>Số kiến nghị</th></tr></thead><tbody>';
-      let index = 1;
-      for (const soKL in grouped) {
-        const rows = grouped[soKL];
-        const trichYeu = ketLuanMap[soKL] || "(Không có trích yếu)";
-        html += `<tr>
-          <td>${index}</td>
-          <td>${soKL}</td>
-          <td>${trichYeu}</td>
-          <td><a href="#" onclick="toggleDetails('${soKL}');return false;">${rows.length}</a></td>
-        </tr>`;
-        html += `<tr id="${soKL}" style="display:none;"><td colspan="4"><ul>`;
-        rows.forEach((r, i) => {
-          const nd = r["Nội dung kiến nghị tại Kết luận thanh tra"] || "(Không có nội dung)";
-          let kq = "";
-          let canCu = "";
-
-          if (document.getElementById('trangThai').value === '1') {
-            kq = r["Nội dung kiến nghị đã hoàn thành"] || "(Không có kết quả hoàn thành)";
-            canCu = r["Căn cứ cập nhật nội dung đã hoàn thành"] || "(Không có căn cứ)";
-          } else if (document.getElementById('trangThai').value === '0') {
-            kq = r["Nội dung kiến nghị còn đang thực hiện"] || "(Không có kết quả chưa thực hiện)";
-            canCu = r["Căn cứ cập nhật nội dung chưa thực hiện dứt điểm"] || "(Không có căn cứ)";
-          }
-
-          html += `<li><strong>Kiến nghị ${i + 1}:</strong><br/>- Nội dung: ${nd}<br/>- Kết quả: ${kq}<br/>- Căn cứ tổng hợp: ${canCu}</li>`;
-        });
-        html += `</ul></td></tr>`;
-        index++;
-      }
-      html += '</tbody></table>';
-      resultDiv.innerHTML = html;
-    }
-
-    function toggleDetails(id) {
-      const el = document.getElementById(id);
-      if (el) {
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'table-row' : 'none';
-      }
-    }
-
-    function handleSearch() {
-      const donVi = document.getElementById('donVi').value.toLowerCase();
-      const trangThai = document.getElementById('trangThai').value;
-
-      const filtered = cachedKienNghi.filter(row => {
-        const donViCol = (row["Tên cá nhân/ tổ chức thực hiện kiến nghị (theo kết luận thanh tra)"] || "").toLowerCase();
-        const cotAA = (row["Kiến nghị đã hoàn thành"] || "").toString().trim();
-        const matchDonVi = !donVi || donViCol.includes(donVi);
-        const matchTrangThai = trangThai === "" || new RegExp(`^${trangThai}(\\.0+)?$`).test(cotAA);
-
-        return matchDonVi && matchTrangThai;
-      });
-
-      const grouped = {};
-      filtered.forEach(row => {
-        const soKL = row["KẾT LUẬN - Số ký hiệu"];
-        if (!soKL) return;
-        if (!grouped[soKL]) grouped[soKL] = [];
-        grouped[soKL].push(row);
-      });
-
-      renderSummary(filtered, grouped);
-      renderTable(grouped);
-    }
-
-    fetchData();
-    document.getElementById('searchButton').addEventListener('click', handleSearch);
-  </script>
+<script src="tonghop_baocao.js"></script>
+<script src="tracuu_du_lieu.js"></script>
 </body>
 </html>
