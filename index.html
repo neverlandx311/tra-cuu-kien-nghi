@@ -122,5 +122,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <script src="tonghop_baocao.js"></script>
 <script src="tracuu_du_lieu.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tabButtons = document.querySelectorAll(".tablinks");
+  const tabContents = document.querySelectorAll(".tabcontent");
+
+  function showTab(tabName) {
+    tabContents.forEach(tc => tc.style.display = "none");
+    tabButtons.forEach(btn => btn.classList.remove("active"));
+    document.getElementById(tabName).style.display = "block";
+    document.querySelector(`.tablinks[data-tab="${tabName}"]`).classList.add("active");
+  }
+
+  tabButtons.forEach(button => {
+    button.addEventListener("click", function () {
+      const tabName = this.getAttribute("data-tab");
+      showTab(tabName);
+    });
+  });
+
+  // Hiển thị tab đầu tiên khi tải trang
+  if (tabButtons.length > 0) {
+    const firstTab = tabButtons[0].getAttribute("data-tab");
+    showTab(firstTab);
+  }
+});
+</script>
+
 </body>
 </html>
